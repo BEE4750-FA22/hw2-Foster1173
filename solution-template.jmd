@@ -208,8 +208,13 @@ government incentives at play, etc. Other information I would want to make the b
 
 # References
 https://juliastats.org/Distributions.jl/stable/
+
 https://cheatsheets.quantecon.org/
+
 https://viveks.me/environmental-systems-analysis/assets/lecture-notes/07-prescriptive-modeling/index.html#31
+
 https://viveks.me/environmental-systems-analysis/assets/lecture-notes/06-dissolved-oxygen/index.html#25
+
 https://viveks.me/environmental-systems-analysis/assets/lecture-notes/04-uncertainty-and-monte-carlo/index.html#9
+
 https://www.geeksforgeeks.org/julia-break-keyword-exiting-from-a-loop-in-julia/#:~:text='break'%20keyword%20in%20Julia%20is,pointer%20out%20of%20the%20loop.
