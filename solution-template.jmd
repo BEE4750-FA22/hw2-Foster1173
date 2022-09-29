@@ -1,6 +1,6 @@
 ---
 title: "BEE 4750/5750 Homework 2"
-author: "Your name here (your netID here)"
+author: "Susie Foster (saf253)"
 date: `j import Dates; Dates.Date(Dates.now())`
 weave_options:
     term: true
@@ -17,23 +17,143 @@ Pkg.instantiate()
 ```
 
 # Problem 1
+```julia
+# creating a function that tests the river model
+function TEST(Cs, C0, B0, N0, ka, kc, kn, x, U)
+  C= Cs*(1 .- exp.(-ka*x/U)) .+ C0*exp.(-ka*x/U) .- B0*(kc/(ka - kc))*(exp.(-kc*x/U) - exp.(-ka*x/U)) - N0*(kn/(ka - kn))*(exp.(-kn*x/U) - exp.(-ka*x/U));
+  return C
+end
+
+# listing variables given
+U= 6; #100000*1000/6; #(m^3/d)*(L/m^3)/(km/day)=L/km
+ka= 0.55; #1/d
+kc= 0.35; #1/d
+kn= 0.25; #1/d
+Cs= 10;   # mg/L
+#distance is 15 km
+Q= [100000 10000 15000]; #m^3/d
+DO= [7.5 5 5]; #mg/L
+CBOD= [5 50 45]; #mg/L
+NBOD= [5 35 35]; #mg/L
+
+```
 
 ## Problem 1.1
+```julia
+x= range(0, 50, length=501);
+# finding the total concentration of DO, CBOD, and NBOD in the river once mixed with waste stream 1
+tDO1= (100000*7.5 + 10000*5)/110000
+tCBOD1= (100000*5 + 10000*50)/110000
+tNBOD1= (100000*5 + 10000*35)/110000
+# creating empty matrix for values of DO in the river over distance 
+riverDO= zeros(501, 1);
+# computing the DO concentrations of the river for the first 15 km
+riverDO[1:151]= TEST(Cs, tDO1, tCBOD1, tNBOD1, ka, kc, kn, x[1:151], U);
+# finding the new total concentrations of DO, CBOD, and NBOD in the river once waste stream 2 is added at x=15 km
+tDO2= (110000*riverDO[151] + 15000*5)/125000;
+tCBOD2= (110000*tCBOD1*exp(-kc*15/U) + 15000*45)/125000;
+tNBOD2= (110000*tNBOD1*exp(-kn*15/U) + 15000*35)/125000;
+# computing the DO concentrations in the river from x=15 km to x=50 km
+riverDO[151:501]= TEST(10, tDO2, tCBOD2, tNBOD2, ka, kc, kn, x[1:351], U);
+# plotting :)
+using Plots
+plot(x, riverDO, label="DO Concentration", title="DO Concentration of the River", xlabel="distance downstream (km)", ylabel="DO Concentration (mg/L)" )
+```
 
 ## Problem 1.2
-
+```julia
+step= 151; # x[151]= 15 km, the starting point
+while riverDO[step] <= 6
+  global step += 1
+end
+miles= x[step] - 15;
+println("it takes $miles miles after waste source 2 for the river to return to 6 mg/L of DO")
+```
 ## Problem 1.3
-
+```julia
+# coming up with a bunch of efficiency values to test. e is the % of waste not discharged to the river
+# only went up to 20% efficiency, because I doubted it would need to be higher than that, and should help speed up code to have smaller vectors
+e= range(0, .2, 201);
+# creating empty matrix for DO Concentrations in the river
+newRiverDO= zeros(351, 1);
+for i=1:201
+  # finding new concentrations of CBOD and NBOD in the river after the treated stream 2 is mixed in at 15 km
+  tCBODnew= (110000*tCBOD1*exp(-kc*15/U) + 15000*45*(1 - e[i]))/125000;
+  tNBODnew= (110000*tNBOD1*exp(-kn*15/U) + 15000*35*(1 - e[i]))/125000;
+  # computing new river DO values from x= 15km to 50 km, and finding the minimum value
+  newRiverDO= TEST(10, tDO2, tCBODnew, tNBODnew, ka, kc, kn, x[1:351], U);
+  Min= minimum(newRiverDO);
+  if Min > 4
+    print("the % of treatment required is: ")
+    print(e[i]*100)
+    print("%")
+    break
+    # this loop checks to see if the condition of DO>4 mg/L has been met yet, and if it has, it stops the for loop
+  end
+end
+```
 ## Problem 1.4
-
+```julia
+e= range(0, .2, 201);
+for i=1:201
+  # this for loop does the same as in 1.3, except it has to re-evaluate all the values starting from x=0 km
+  newriverDO= zeros(351, 1);
+  tCBOD1new= (100000*5 + 10000*50*(1 - e[i]))/110000
+  tNBOD1new= (100000*5 + 10000*35*(1 - e[i]))/110000
+  DO15km= TEST(Cs, tDO1, tCBOD1new, tNBOD1new, ka, kc, kn, x[151], U);
+  tDO2new= (110000*DO15km + 15000*5)/125000;
+  tCBOD2new= (110000*tCBOD1*exp(-kc*15/U) + 15000*45*(1 - e[i]))/125000;
+  tNBOD2new= (110000*tNBOD1*exp(-kn*15/U) + 15000*35*(1 - e[i]))/125000;
+  newRiverDO= TEST(10, tDO2new, tCBOD2new, tNBOD2new, ka, kc, kn, x[1:351], U);
+  Min= minimum(newRiverDO);
+  if Min > 4
+    print("the % of treatment required is: ")
+    print(e[i]*100)
+    print("%")
+    break
+  end
+end
+```
 ## Problem 1.5
+I would choose equally treating both plants. Having both waste streams being treated provides more control over the DO concentration over time, while its 
+not predicted to go below 4 mg/L before waste stream 2, if it did, there would be no treatment system in place to counter act that. Additionally, it is very unequal 
+to mandate that one plant has to treat their waste and not the other, though there are certainly a lot of unknowns that could impact all of this. How and who is paying 
+for the treatment? Can treatment be ramped up or down easily if needed (changing the efficiency)? How confident can we be in the mathematical model? How confident can
+ we be in the DO, CBOD, and NBOD data of the river and waste streams that was provided? Are there other factors that effect the DO concentration over time? All of these
+ questions currently do not have answers, and could change how I think about the model and the best solution. 
 
 ## Problem 1.6
-
+```julia
+N= 100; # picking a sample size
+# coming up with uniformly distributed random values for CBOD and NBOD
+CBODsample= 3*rand(N) .+ 4;
+NBODsample= 5*rand(N) .+ 3;
+# pre-assigning numbers
+fails= 0;
+MIN= zeros(N, 1);
+for i=1:N
+  x= range(0, 50, length=501);
+  e= .081;
+  tDO1= (100000*7.5 + 10000*5)/110000;
+  tCBOD1= (100000*CBODsample[i] + 10000*50*(1 - e))/110000;
+  tNBOD1= (100000*NBODsample[i] + 10000*35*(1 - e))/110000;
+  riverDO= zeros(501, 1);
+  riverDO[1:151]= TEST(10, tDO1, tCBOD1, tNBOD1, .55, .35, .25, x[1:151], 6);
+  tDO2= (110000*riverDO[151] + 15000*5)/125000;
+  tCBOD2= (110000*tCBOD1*exp(-kc*15/6) + 15000*45*(1 - e))/125000;
+  tNBOD2= (110000*tNBOD1*exp(-kn*15/6) + 15000*35*(1 - e))/125000;
+  riverDO[151:501]= TEST(10, tDO2, tCBOD2, tNBOD2, ka, kc, kn, x[1:351], 6);
+  MIN[i]= minimum(riverDO);
+  if MIN[i] <= 4
+  global fails += 1
+  end
+end
+Pfail= fails/N;
+print("the probability of the treatment method failing is: "); print(Pfail*100); print("%")
+```
 ## Problem 1.7
 
-```julia; echo=false
-# This block will not show up in compiled output.
+```julia
 
 using Distributions
 using PDMats
@@ -48,10 +168,48 @@ function sample_correlated_uniform(n, a, b, corr_coef=0.7)
   samples = (unif_samples .* [a[2] - a[1] b[2] - b[1]]) .+ [a[1] b[1]]
   return samples
 end
+
+SampleValues= sample_correlated_uniform(N, [4 7], [3 8], 0.7);
+fails= 0;
+MIN= zeros(N, 1);
+for i=1:N
+  x= range(0, 50, length=501);
+  e= .081;
+  tDO1= (100000*7.5 + 10000*5)/110000;
+  tCBOD1= (100000*SampleValues[i, 1] + 10000*50*(1 - e))/110000;
+  tNBOD1= (100000*SampleValues[i, 2] + 10000*35*(1 - e))/110000;
+  riverDO= zeros(501, 1);
+  riverDO[1:151]= TEST(10, tDO1, tCBOD1, tNBOD1, .55, .35, .25, x[1:151], 6);
+  tDO2= (110000*riverDO[151] + 15000*5)/125000;
+  tCBOD2= (110000*tCBOD1*exp(-kc*15/6) + 15000*45*(1 - e))/125000;
+  tNBOD2= (110000*tNBOD1*exp(-kn*15/6) + 15000*35*(1 - e))/125000;
+  riverDO[151:501]= TEST(10, tDO2, tCBOD2, tNBOD2, ka, kc, kn, x[1:351], 6);
+  MIN[i]= minimum(riverDO);
+  if MIN[i] <= 4
+  global fails += 1
+  end
+end
+Pfail= fails/N;
+print("the probability of the treatment method failing is: "); print(Pfail*100); print("%")
+
 ```
 
 ## Problem 1.8
+Discuss how the presence of uncertainty and dependence between variables might affect your decision-making process. 
+Would you stick with the same strategy as in Problem 1.5, or find a new strategy? What other information would you need, if any?
 
-```
+Based on the uncertainty, I would change my solution to treat for the worst case scenario since the river should never go below 4 mg/L of DO. 
+I would still have both waste streams treated, I would just treat them more. Also, I would likely have them treat down to the same CBOD and 
+NBOD effluent concentrations, which does mean that the heavier polluter ends up treating their waste stream more than the other. I think this 
+is a more fair approach, with what little we know about the economics and costs of the treatment system; costs, who is paying, if there are 
+government incentives at play, etc. Other information I would want to make the best decision are more data, like if the river flow and velocity
+ changes and by how much, how much uncertainy is there in the river DO concentration before mixing with the waste streams. How much uncertainty
+ is there in the DO, CBOD, and NBOD of the waste streams. Any additional information I had access to would help in making a more informed decision. 
 
 # References
+https://juliastats.org/Distributions.jl/stable/
+https://cheatsheets.quantecon.org/
+https://viveks.me/environmental-systems-analysis/assets/lecture-notes/07-prescriptive-modeling/index.html#31
+https://viveks.me/environmental-systems-analysis/assets/lecture-notes/06-dissolved-oxygen/index.html#25
+https://viveks.me/environmental-systems-analysis/assets/lecture-notes/04-uncertainty-and-monte-carlo/index.html#9
+https://www.geeksforgeeks.org/julia-break-keyword-exiting-from-a-loop-in-julia/#:~:text='break'%20keyword%20in%20Julia%20is,pointer%20out%20of%20the%20loop.
